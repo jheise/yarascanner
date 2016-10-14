@@ -2,19 +2,25 @@ package main
 
 import (
 	// standard
-	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+
+	// external
+	"github.com/gorilla/mux"
 )
 
 func DownloadHandler(w http.ResponseWriter, r *http.Request) {
-	response := map[string]string{}
-	response["msg"] = "Feature not yet implemented"
+	vars := mux.Vars(r)
+	filename := vars["filename"]
+	info.Printf("Serving %s\n", filename)
 
-	output, err := json.Marshal(response)
+	filepath := fullpath(filename)
+
+	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		elog.Println(err)
 	}
 
-	fmt.Fprintf(w, string(output))
+	fmt.Fprintf(w, string(data))
 }
