@@ -2,8 +2,21 @@ package main
 
 import (
 	// standard
+	"fmt"
 	"io/ioutil"
 )
+
+type StringArgs []string
+
+func (s *StringArgs) String() string {
+	return fmt.Sprintf("%s", *s)
+}
+
+func (s *StringArgs) Set(value string) error {
+	*s = append(*s, value)
+
+	return nil
+}
 
 func fileExists(target string) (bool, error) {
 	retval := false

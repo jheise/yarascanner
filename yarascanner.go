@@ -14,7 +14,7 @@ import (
 
 var (
 	// config options
-	rules_dir   string
+	index_files StringArgs
 	uploads_dir string
 	address     string
 	port        string
@@ -30,7 +30,7 @@ var (
 )
 
 func init() {
-	flag.StringVar(&rules_dir, "rules", "rules", "path to yara rules")
+	flag.Var(&index_files, "i", "path to yara rules")
 	flag.StringVar(&uploads_dir, "uploads", "uploads", "path to uploads directory")
 	flag.StringVar(&address, "address", "0.0.0.0", "address to bind to")
 	flag.StringVar(&port, "port", "9999", "port to bind to")
@@ -52,7 +52,24 @@ func main() {
 
 	// create scanner
 	info.Println("Initializing scanner")
-	go scanner()
+	scanner, err := NewScanner(requests, responses)
+	if err != nil {
+		panic(err)
+	}
+
+	// load indexes
+	for _, index := range index_files {
+		info.Println("Loading index: " + index)
+		err = scanner.LoadIndex(index)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	// launch scanner
+	go scanner.Run()
+
+	//go scanner()
 
 	// setup http server and begin serving traffic
 	r := mux.NewRouter()
