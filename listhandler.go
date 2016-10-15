@@ -16,6 +16,8 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 	filenames, err := ioutil.ReadDir(uploads_dir)
 	if err != nil {
 		elog.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	for _, filename := range filenames {
@@ -25,6 +27,8 @@ func ListHandler(w http.ResponseWriter, r *http.Request) {
 	output, err := json.Marshal(files)
 	if err != nil {
 		elog.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	fmt.Fprintf(w, string(output))

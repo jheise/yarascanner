@@ -2,9 +2,9 @@ package main
 
 import (
 	// standard
-	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	// external
 	"github.com/hillu/go-yara"
@@ -17,46 +17,43 @@ type Response struct {
 	Matches  []*yaramsg.Match
 }
 
-// load yara rules
-func loadRules(compilr *yara.Compiler) error {
-	var retcode error
-	filenames, err := ioutil.ReadDir(rules_dir)
-	if err != nil {
-		return err
-	}
+// load rule and process directory
 
-	for _, filename := range filenames {
-		if !filename.IsDir() {
-			fullpath := rules_dir + "/" + filename.Name()
-			info.Println("Adding " + fullpath)
+func loadRule(compiler *yara.Compiler, namespace string, rulepath string) error {
+	var retval error
 
-			filehandle, err := os.Open(fullpath)
-			if err != nil {
-				return err
-			}
-			defer filehandle.Close()
-
-			err = compilr.AddFile(filehandle, "rules")
-			if err != nil {
-				fmt.Println(fullpath)
-				fmt.Println(err)
-			}
-		}
-	}
-
-	return retcode
-}
-
-// load rules from file
-func loadRulesFile(compilr *yara.Compiler) error {
-	filehandle, err := os.Open(rules_dir)
+	filehandle, err := os.Open(rulepath)
 	if err != nil {
 		return err
 	}
 	defer filehandle.Close()
 
-	err = compilr.AddFile(filehandle, "rules")
-	return err
+	err = compiler.AddFile(filehandle, namespace)
+	if err != nil {
+		elog.Println(err)
+	}
+	return retval
+}
+
+// load all indexes in a directory
+
+func processDirectory(compiler *yara.Compiler, rules_src string) {
+	filenames, err := ioutil.ReadDir(rules_src)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, filename := range filenames {
+		fullpath := rules_src + "/" + filename.Name()
+		if strings.HasSuffix(filename.Name(), ".yar") && filename.Name() != "index.yar" {
+			info.Println("Loading Rule " + filename.Name())
+			namespace := strings.Split(filename.Name(), "_")[0]
+			err = loadRule(compiler, namespace, fullpath)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}
 }
 
 func scan(compiler *yara.Compiler, filename string) (*Response, error) {
@@ -71,7 +68,7 @@ func scan(compiler *yara.Compiler, filename string) (*Response, error) {
 	}
 
 	filepath := uploads_dir + "/" + filename
-	output, err := rules.ScanFile(filepath, 0, 30)
+	output, err := rules.ScanFile(filepath, 0, 300)
 	if err != nil {
 		return response, err
 	}
@@ -102,11 +99,12 @@ func scanner() {
 	}
 
 	info.Println("Loading rules from " + rules_dir)
-	err = loadRules(compiler)
+	//err = loadRules(compiler)
 	//err = loadRulesFile(compiler)
-	if err != nil {
-		elog.Println(err)
-	}
+	//if err != nil {
+	//	elog.Println(err)
+	//}
+	processDirectory(compiler, rules_dir)
 
 	info.Println("Waiting for scan requests")
 	for request := range requests {

@@ -33,6 +33,7 @@ func UploadHandler(w http.ResponseWriter, r *http.Request) {
 	output, err := json.Marshal(response)
 	if err != nil {
 		elog.Println(err)
+
 	}
 
 	fmt.Fprintf(w, string(output))

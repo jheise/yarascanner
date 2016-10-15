@@ -20,6 +20,8 @@ func DownloadHandler(w http.ResponseWriter, r *http.Request) {
 	data, err := ioutil.ReadFile(filepath)
 	if err != nil {
 		elog.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	fmt.Fprintf(w, string(data))
