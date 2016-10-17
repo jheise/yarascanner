@@ -1,4 +1,4 @@
-FROM golang
+FROM jheise/ubuntu-golang
 
 RUN apt-get update && apt-get install -y libyara-dev git
 
