@@ -16,10 +16,22 @@ type Response struct {
 	Matches  []*yaramsg.Match
 }
 
+// struct to make requests to the scanner
+const (
+	ScanRequest   = iota
+	NameSpaceList = iota
+	RuleList      = iota
+)
+
+type Request struct {
+	RequestType  int
+	RequestQuery string
+}
+
 // struct to hold compiler and channels
 type Scanner struct {
 	compiler  *yara.Compiler
-	requests  chan string
+	requests  chan *Request
 	responses chan *Response
 }
 
@@ -79,7 +91,7 @@ func scan(compiler *yara.Compiler, filename string) (*Response, error) {
 
 }
 
-func NewScanner(req chan string, resp chan *Response) (*Scanner, error) {
+func NewScanner(req chan *Request, resp chan *Response) (*Scanner, error) {
 	scanner := new(Scanner)
 	scanner.requests = req
 	scanner.responses = resp
@@ -106,10 +118,13 @@ func (scanner *Scanner) LoadIndex(indexPath string) error {
 func (scanner *Scanner) Run() {
 	info.Println("Waiting for scan requests")
 	for request := range scanner.requests {
-		response, err := scan(scanner.compiler, request)
-		if err != nil {
-			elog.Println(err)
+		switch request.RequestType {
+		case ScanRequest:
+			response, err := scan(scanner.compiler, request.RequestQuery)
+			if err != nil {
+				elog.Println(err)
+			}
+			scanner.responses <- response
 		}
-		scanner.responses <- response
 	}
 }
