@@ -2,129 +2,117 @@ package main
 
 import (
 	// standard
-	"os"
-	"strings"
+	"fmt"
 
 	// external
-	"github.com/hillu/go-yara"
 	"github.com/jheise/yaramsg"
 )
 
-// struct to hold multiple matches
-type Response struct {
-	Filename string
-	Matches  []*yaramsg.Match
-}
-
-// struct to make requests to the scanner
-const (
-	ScanRequest   = iota
-	NameSpaceList = iota
-	RuleList      = iota
-)
-
-type Request struct {
-	RequestType  int
-	RequestQuery string
-}
-
 // struct to hold compiler and channels
 type Scanner struct {
-	compiler  *yara.Compiler
-	requests  chan *Request
-	responses chan *Response
+	rulesets     []*RuleSet
+	scanrequests chan *ScanRequest
+	namerequests chan *RuleSetRequest
+	rulerequests chan *RuleListRequest
 }
 
-// load rule and process directory
-
-func loadIndex(compiler *yara.Compiler, indexpath string) error {
-	filehandle, err := os.Open(indexpath)
-	if err != nil {
-		return err
-	}
-	defer filehandle.Close()
-
-	// generate namespace
-	fields := strings.Split(indexpath, "/")
-	filename := fields[len(fields)-1]
-	namespace := strings.Split(filename, "_")[0]
-
-	err = compiler.AddFile(filehandle, namespace)
-	if err != nil {
-		elog.Println(err)
-		return err
-	}
-
-	return nil
-}
-
-func scan(compiler *yara.Compiler, filename string) (*Response, error) {
-	response := new(Response)
+func (self *Scanner) scan(filename string) (*ScanResponse, error) {
+	response := new(ScanResponse)
 	response.Filename = filename
 	var err error
 	var matches []*yaramsg.Match
 
-	rules, err := compiler.GetRules()
-	if err != nil {
-		return response, err
-	}
-
 	filepath := uploads_dir + "/" + filename
-	output, err := rules.ScanFile(filepath, 0, 300)
-	if err != nil {
-		return response, err
+
+	for _, ruleset := range self.rulesets {
+		output, err := ruleset.Rules.ScanFile(filepath, 0, 300)
+		if err != nil {
+			return response, err
+		}
+		for _, resp := range output {
+			match := new(yaramsg.Match)
+			match.Rule = resp.Rule
+			match.Namespace = resp.Namespace
+			match.Tags = resp.Tags
+
+			matches = append(matches, match)
+
+		}
+
 	}
-
-	for _, resp := range output {
-		match := new(yaramsg.Match)
-		match.Rule = resp.Rule
-		match.Namespace = resp.Namespace
-		match.Tags = resp.Tags
-
-		matches = append(matches, match)
-
-	}
-
 	response.Matches = matches
 
 	return response, err
-
 }
 
-func NewScanner(req chan *Request, resp chan *Response) (*Scanner, error) {
-	scanner := new(Scanner)
-	scanner.requests = req
-	scanner.responses = resp
-
-	compiler, err := yara.NewCompiler()
+func (self *Scanner) LoadIndex(indexPath string) error {
+	ruleset, err := NewRuleSet(indexPath)
 	if err != nil {
-		return nil, err
-	}
-	scanner.compiler = compiler
-
-	return scanner, nil
-}
-
-func (scanner *Scanner) LoadIndex(indexPath string) error {
-	err := loadIndex(scanner.compiler, indexPath)
-	if err != nil {
-		elog.Println(err)
 		return err
 	}
-
+	self.rulesets = append(self.rulesets, ruleset)
 	return nil
 }
 
-func (scanner *Scanner) Run() {
-	info.Println("Waiting for scan requests")
-	for request := range scanner.requests {
-		switch request.RequestType {
-		case ScanRequest:
-			response, err := scan(scanner.compiler, request.RequestQuery)
+func (self *Scanner) listRuleSets() *RuleSetResponse {
+	response := new(RuleSetResponse)
+	for _, ruleset := range self.rulesets {
+		response.Names = append(response.Names, ruleset.Name)
+	}
+
+	return response
+
+}
+
+func (self *Scanner) listRules(rulesetname string) (*RuleListResponse, error) {
+	response := new(RuleListResponse)
+	fmt.Printf("listRules called, %s\n", rulesetname)
+	for _, ruleset := range self.rulesets {
+		fmt.Printf("Looking for %s, looking at %s\n", rulesetname, ruleset.Name)
+		if ruleset.Name == rulesetname {
+			rules, err := ruleset.ListRules()
 			if err != nil {
-				elog.Println(err)
+				return nil, err
 			}
-			scanner.responses <- response
+			for _, rule := range rules {
+				response.Rules = append(response.Rules, rule)
+			}
 		}
 	}
+
+	return response, nil
+}
+
+func (self *Scanner) Run() {
+	info.Println("Waiting for scan requests")
+	for {
+		select {
+		case scanmsg := <-scanrequests:
+			response, err := self.scan(scanmsg.Filename)
+			if err != nil {
+				elog.Println(err)
+				return
+			}
+			scanmsg.ResponseChan <- response
+		case setmsg := <-namerequests:
+			response := self.listRuleSets()
+			setmsg.ResponseChan <- response
+		case rulemsg := <-rulerequests:
+			response, err := self.listRules(rulemsg.RuleSet)
+			if err != nil {
+				elog.Println(err)
+				return
+			}
+			rulemsg.ResponseChan <- response
+		}
+	}
+}
+
+func NewScanner(scan chan *ScanRequest, name chan *RuleSetRequest, list chan *RuleListRequest) (*Scanner, error) {
+	scanner := new(Scanner)
+	scanner.scanrequests = scan
+	scanner.namerequests = name
+	scanner.rulerequests = list
+
+	return scanner, nil
 }

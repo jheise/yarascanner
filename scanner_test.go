@@ -4,8 +4,8 @@ import (
 	"testing"
 )
 
-func buildChannels() (chan string, chan *Response) {
-	requests := make(chan string)
+func buildChannels() (chan *Request, chan *Response) {
+	requests := make(chan *Request)
 	responses := make(chan *Response)
 
 	return requests, responses
@@ -31,7 +31,7 @@ func TestLoadIndex(t *testing.T) {
 		t.Error(err)
 	}
 
-	err = scanner.LoadIndex("testdata/rules/malware_index.yar")
+	err = scanner.LoadIndex("testdata/rules/Crypto_index.yar")
 	if err != nil {
 		t.Error(err)
 	}

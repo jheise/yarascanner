@@ -1,4 +1,5 @@
-testdata
 yarascanner
-uploads
 *.swp
+.idea/*
+/uploads/
+/testdata/

@@ -29,16 +29,10 @@ func ScanHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// send request for scanning
-	requests <- filename
+	newRequest := NewScanRequest(filename)
+	scanrequests <- newRequest
 
-	// wait for response, need to be fixed
-	var response *Response
-	for current := range responses {
-		if current.Filename == filename {
-			response = current
-			break
-		}
-	}
+	response := <-newRequest.ResponseChan
 
 	output, err := json.Marshal(response)
 	if err != nil {

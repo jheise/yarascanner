@@ -21,8 +21,9 @@ var (
 	addrport    string
 
 	// channels
-	requests  chan string
-	responses chan *Response
+	scanrequests chan *ScanRequest
+	namerequests chan *RuleSetRequest
+	rulerequests chan *RuleListRequest
 
 	// loggers
 	info *log.Logger
@@ -47,12 +48,13 @@ func init() {
 func main() {
 	// create channels
 	info.Println("Initializing channels")
-	requests = make(chan string)
-	responses = make(chan *Response)
+	scanrequests = make(chan *ScanRequest)
+	namerequests = make(chan *RuleSetRequest)
+	rulerequests = make(chan *RuleListRequest)
 
 	// create scanner
 	info.Println("Initializing scanner")
-	scanner, err := NewScanner(requests, responses)
+	scanner, err := NewScanner(scanrequests, namerequests, rulerequests)
 	if err != nil {
 		panic(err)
 	}
@@ -79,6 +81,8 @@ func main() {
 	r.HandleFunc("/scanner/v1/files/{filename}", DownloadHandler).Methods("GET")
 	r.HandleFunc("/scanner/v1/files/{filename}", RemoveHandler).Methods("DELETE")
 	r.HandleFunc("/scanner/v1/files/{filename}/scan/", ScanHandler).Methods("GET")
+	r.HandleFunc("/scanner/v1/ruleset/", RuleSetListHandler).Methods("GET")
+	r.HandleFunc("/scanner/v1/ruleset/{ruleset}", RuleListHandler).Methods("GET")
 	http.Handle("/", r)
 	loggedRouter := handlers.CombinedLoggingHandler(os.Stdout, r)
 	http.ListenAndServe(addrport, loggedRouter)
