@@ -14,6 +14,10 @@ Available functions are
 - DELETE /scanner/v1/files/{filename} - remove specified file
 
 - GET /scanner/v1/files/{filename}/scan/ - scan specified file
+
+- GET /scanner/v1/ruleset/ - list all loaded ruleset
+
+- GET /scanner/v1/ruleset/{ruleset} - list all rules from a loaded ruleset
 ---
 ```
 Usage of ./yarascanner:
